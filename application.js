@@ -3,7 +3,7 @@
 
   var request = superagent;
   var synchronizeInProgress = false;
-  var synchronizeRequested = false;
+  var waitingSynchronizePromise;
 
   // Some global variables (database, references to key UI elements)
   var db, input, ul;
@@ -16,7 +16,8 @@
       document.body.addEventListener('click', onClick);
     })
     .then(refreshView)
-    .then(synchronize);
+    .then(synchronize)
+    .then(refreshView);
 
   function onClick(e) {
 
@@ -33,7 +34,8 @@
           return databaseTodosPut(todo);
         })
         .then(refreshView)
-        .then(synchronize);
+        .then(synchronize)
+        .then(refreshView);
     }
   }
 
@@ -59,7 +61,8 @@
     input.value = '';
     databaseTodosPut(todo)
       .then(refreshView)
-      .then(synchronize);
+      .then(synchronize)
+      .then(refreshView);
   }
 
   function databaseOpen() {
@@ -86,84 +89,88 @@
 
   function synchronize() {
     if (synchronizeInProgress) {
-      synchronizeRequested = true;
-    } else {
-      synchronizeInProgress = true;
-      Promise.all([serverTodosGet(), databaseTodosGet()])
-          .then(function(results) {
-            var remoteTodos = results[0].body;
-            var localTodos = results[1];
-            var localTodosRemoteIds = localTodos.map(function(todo) { return todo.remoteId; });
+      if (!waitingSynchronizePromise) {
+        waitingSynchronizePromise = new Promise(function(resolve, reject) {
+          document.body.addEventListener('synchronized', function() {
+            waitingSynchronizePromise = undefined;
+            resolve();
+          });
+        }).then(synchronize);
+      }
+      return waitingSynchronizePromise;
+    }
+    synchronizeInProgress = true;
+    return Promise.all([serverTodosGet(), databaseTodosGet()])
+        .then(function(results) {
+          var remoteTodos = results[0].body;
+          var localTodos = results[1];
+          var localTodosRemoteIds = localTodos.map(function(todo) { return todo.remoteId; });
 
-            // Loop through local todos and if they haven't been
-            // posted to the server, post them.
-            var promises = localTodos.map(function(todo) {
+          // Loop through local todos and if they haven't been
+          // posted to the server, post them.
+          var promises = localTodos.map(function(todo) {
 
-              // If the remote id exists maybe update the text try to update it
-              if (todo.remoteId) {
+            // If the remote id exists maybe update the text try to update it
+            if (todo.remoteId) {
 
-                // Has it been marked for deletion?
-                if (todo.deleted) {
-                  return serverTodosDelete(todo)
-                    .then(function() {
-                      return databaseTodosDelete(todo);
-                    });
-                }
-
-                // Otherwise try to update it
-                return serverTodosUpdate(todo)
-
-                  // Only need to handle the error case (probably a conflict)
-                  .catch(function(res) {
-                    return serverTodosGet(todo)
-                      .then(function(res) {
-                        return databaseTodosPut({
-                          localId: todo.localId,
-                          remoteId: todo.remoteId,
-                          text: res.body.text,
-                          updated: res.body.updated
-                        });
-
-                      // Todo has been deleted, delete it locally too
-                      }, function(res) {
-                        if (res.status === 404) databaseTodosDelete(todo);
-                    });
+              // Has it been marked for deletion?
+              if (todo.deleted) {
+                return serverTodosDelete(todo)
+                  .then(function() {
+                    return databaseTodosDelete(todo);
                   });
               }
 
-              // Otherwise create on the remote server & update local id
-              return serverTodosAdd(todo)
-                .then(function(res) {
-                    todo.remoteId = res.text;
-                    return databaseTodosPut(todo);
-                }, function(res) {
-                  if (res.status === 400) return databaseTodosDelete(todo);
-                });
-            });
-            promises.concat(remoteTodos.map(function(todo) {
-              var localCopyIndex = localTodosRemoteIds.indexOf(todo._id);
+              // Otherwise try to update it
+              return serverTodosUpdate(todo)
 
-              // We don't have todo, maybe create it?
-              if (localCopyIndex === -1) {
-                return databaseTodosPut({
-                  text: todo.text,
-                  remoteId: todo._id,
-                  updated: todo.updated,
-                }).then(refreshView);
-              }
-            }));
-            return Promise.all(promises);
-        }, function(err) {
-          console.error(err, "Cannot connect to server");
-        })
-        .then(function() {
-          synchronizeInProgress = false;
-          if (synchronizeRequested) {
-            synchronizeRequested = false;
-            synchronize();
-          }
-        });
-    }
+                // Only need to handle the error case (probably a conflict)
+                .catch(function(res) {
+                  return serverTodosGet(todo)
+                    .then(function(res) {
+                      return databaseTodosPut({
+                        localId: todo.localId,
+                        remoteId: todo.remoteId,
+                        text: res.body.text,
+                        updated: res.body.updated
+                      });
+
+                    // Todo has been deleted, delete it locally too
+                    }, function(res) {
+                      if (res.status === 404) databaseTodosDelete(todo);
+                  });
+                });
+            }
+
+            // Otherwise create on the remote server & update local id
+            return serverTodosAdd(todo)
+              .then(function(res) {
+                  todo.remoteId = res.text;
+                  return databaseTodosPut(todo);
+              }, function(res) {
+                if (res.status === 400) return databaseTodosDelete(todo);
+              });
+          });
+          promises.concat(remoteTodos.map(function(todo) {
+            var localCopyIndex = localTodosRemoteIds.indexOf(todo._id);
+
+            // We don't have todo, maybe create it?
+            if (localCopyIndex === -1) {
+              return databaseTodosPut({
+                text: todo.text,
+                remoteId: todo._id,
+                updated: todo.updated,
+              }).then(refreshView);
+            }
+          }));
+          return Promise.all(promises);
+      }, function(err) {
+        console.error(err, "Cannot connect to server");
+      })
+      .then(function() {
+        synchronizeInProgress = false;
+        document.body.dispatchEvent(new Event('synchronized'));
+      });
   }
 
   function refreshView() {

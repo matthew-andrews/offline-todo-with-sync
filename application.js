@@ -15,7 +15,8 @@
       document.body.addEventListener('submit', onSubmit);
       document.body.addEventListener('click', onClick);
     })
-    .then(refreshSynchronizeRefresh);
+    .then(refreshView)
+    .then(synchronize);
 
   function onClick(e) {
 
@@ -31,7 +32,8 @@
           todo.updated = Date.now();
           return databaseTodosPut(todo);
         })
-        .then(refreshSynchronizeRefresh);
+        .then(refreshView)
+        .then(synchronize);
     }
   }
 
@@ -44,7 +46,8 @@
     };
     input.value = '';
     databaseTodosPut(todo)
-      .then(refreshSynchronizeRefresh);
+      .then(refreshView)
+      .then(synchronize);
   }
 
   function renderAllTodos(todos) {
@@ -57,12 +60,6 @@
 
   function todoToHtml(todo) {
     return '<li><button id="'+todo.localId+'">delete</button>'+todo.text+'</li>';
-  }
-
-  function refreshSynchronizeRefresh() {
-    return refreshView()
-      .then(synchronize)
-      .then(refreshView);
   }
 
   function refreshView() {
@@ -151,6 +148,7 @@
       console.error(err, "Cannot connect to server");
     })
     .then(function() {
+      refreshView();
       synchronizeInProgress = false;
       document.body.dispatchEvent(new Event('synchronized'));
     });

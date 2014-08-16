@@ -1,9 +1,9 @@
 (function() {
   var host = location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://offline-todo-api.herokuapp.com';
 
-  var request = superagent;
-  var synchronizeInProgress = false;
-  var waitingSynchronizePromise;
+  // Some globals (although they should probably be private) to stop synchronization
+  // running twice at the same time
+  var synchronizeInProgress = false, waitingSynchronizePromise;
 
   // Some global variables (database, references to key UI elements)
   var db, input, ul;
@@ -15,9 +15,7 @@
       document.body.addEventListener('submit', onSubmit);
       document.body.addEventListener('click', onClick);
     })
-    .then(refreshView)
-    .then(synchronize)
-    .then(refreshView);
+    .then(refreshSynchronizeRefresh);
 
   function onClick(e) {
 
@@ -33,9 +31,7 @@
           todo.updated = Date.now();
           return databaseTodosPut(todo);
         })
-        .then(refreshView)
-        .then(synchronize)
-        .then(refreshView);
+        .then(refreshSynchronizeRefresh);
     }
   }
 
@@ -60,9 +56,7 @@
     };
     input.value = '';
     databaseTodosPut(todo)
-      .then(refreshView)
-      .then(synchronize)
-      .then(refreshView);
+      .then(refreshSynchronizeRefresh);
   }
 
   function databaseOpen() {
@@ -85,6 +79,12 @@
       };
       request.onerror = reject;
     });
+  }
+
+  function refreshSynchronizeRefresh() {
+    return refreshView()
+      .then(synchronize)
+      .then(refreshView);
   }
 
   function synchronize() {
@@ -244,7 +244,7 @@
 
   function serverTodosAdd(todo) {
     return new Promise(function(resolve, reject) {
-      request.post(host+'/todos')
+      superagent.post(host+'/todos')
         .send({ text: todo.text, updated: todo.updated })
         .end(function(res) {
           if (res.ok) {
@@ -260,7 +260,7 @@
 
   function serverTodosUpdate(todo) {
     return new Promise(function(resolve, reject) {
-      request.put(host+'/todos/'+todo.remoteId)
+      superagent.put(host+'/todos/'+todo.remoteId)
         .send({ text: todo.text, updated: todo.updated })
         .end(function(res) {
           if (res.ok) resolve(res);
@@ -271,7 +271,7 @@
 
   function serverTodosGet(todo) {
     return new Promise(function(resolve, reject) {
-      request.get(host + '/todos/' + (todo && todo.remoteId ? todo.remoteId : ''))
+      superagent.get(host + '/todos/' + (todo && todo.remoteId ? todo.remoteId : ''))
         .end(function(err, res) {
           if (res.ok) resolve(res);
           else reject(res);
@@ -281,7 +281,7 @@
 
   function serverTodosDelete(todo) {
     return new Promise(function(resolve, reject) {
-      request.del(host+'/todos/'+todo.remoteId)
+      superagent.del(host+'/todos/'+todo.remoteId)
         .send({ text: todo.text, updated: todo.updated })
         .end(function(res) {
           if (res.ok) resolve();

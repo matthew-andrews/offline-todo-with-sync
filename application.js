@@ -3,6 +3,7 @@
 
   var request = superagent;
   var synchronizeInProgress = false;
+  var synchronizeRequested = false;
 
   // Some global variables (database, references to key UI elements)
   var db, input, ul;
@@ -85,9 +86,8 @@
 
   function synchronize() {
     if (synchronizeInProgress) {
-      return console.log("cannot sync right now");
+      synchronizeRequested = true;
     }
-    console.log('starting sync');
     synchronizeInProgress = true;
     return Promise.all([serverTodosGet(), databaseTodosGet()])
         .then(function(results) {
@@ -157,8 +157,11 @@
         console.error(err, "Cannot connect to server");
       })
       .then(function() {
-        console.log('sync thinks it\'s over');
         synchronizeInProgress = false;
+        if (synchronizeRequested) {
+          synchronizeRequested = false;
+          synchronize();
+        }
       });
   }
 

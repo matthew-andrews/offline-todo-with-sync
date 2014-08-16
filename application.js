@@ -2,6 +2,7 @@
   var host = location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://offline-todo-api.herokuapp.com';
 
   var request = superagent;
+  var synchronizeInProgress = false;
 
   // Some global variables (database, references to key UI elements)
   var db, input, ul;
@@ -83,6 +84,10 @@
   }
 
   function synchronize() {
+    if (synchronizeInProgress) {
+      return console.log("cannot sync right now");
+    }
+    console.log('starting sync');
     return Promise.all([serverTodosGet(), databaseTodosGet()])
         .then(function(results) {
           var remoteTodos = results[0].body;
@@ -100,7 +105,7 @@
               if (todo.deleted) {
                 return serverTodosDelete(todo)
                   .then(function() {
-                    databaseTodosDelete(todo);
+                    return databaseTodosDelete(todo);
                   });
               }
 
@@ -111,7 +116,7 @@
                 .catch(function(res) {
                   return serverTodosGet(todo)
                     .then(function(res) {
-                      databaseTodosPut({
+                      return databaseTodosPut({
                         localId: todo.localId,
                         remoteId: todo.remoteId,
                         text: res.body.text,
@@ -151,7 +156,8 @@
         console.error(err, "Cannot connect to server");
       })
       .then(function() {
-        console.log('sync thinks it\'s finished');
+        console.log('sync thinks it\'s over');
+        synchronizeInProgress = false;
       });
   }
 

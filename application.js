@@ -3,7 +3,7 @@
 
   // Some globals (although they should probably be private) to stop synchronization
   // running twice at the same time
-  var synchronizeInProgress = false, waitingSynchronizePromise;
+  var synchronizeInProgress = false, willSynchronizePromise;
 
   // Some global variables (database, references to key UI elements)
   var db, input, ul;
@@ -72,16 +72,16 @@
 
   function synchronize() {
     if (synchronizeInProgress) {
-      if (!waitingSynchronizePromise) {
-        waitingSynchronizePromise = new Promise(function(resolve, reject) {
+      if (!willSynchronizePromise) {
+        willSynchronizePromise = new Promise(function(resolve, reject) {
           document.body.addEventListener('synchronized', function onSynchronized() {
-            waitingSynchronizePromise = undefined;
+            willSynchronizePromise = undefined;
             document.body.removeEventListener('synchronized', onSynchronized);
             resolve();
           });
         }).then(synchronize);
       }
-      return waitingSynchronizePromise;
+      return willSynchronizePromise;
     }
     synchronizeInProgress = true;
     return Promise.all([serverTodosGet(), databaseTodosGet()])

@@ -74,8 +74,9 @@
     if (synchronizeInProgress) {
       if (!waitingSynchronizePromise) {
         waitingSynchronizePromise = new Promise(function(resolve, reject) {
-          document.body.addEventListener('synchronized', function() {
+          document.body.addEventListener('synchronized', function onSynchronized() {
             waitingSynchronizePromise = undefined;
+            document.body.removeEventListener('synchronized', onSynchronized);
             resolve();
           });
         }).then(synchronize);

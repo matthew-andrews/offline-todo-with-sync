@@ -12,9 +12,9 @@
       ul = document.getElementsByTagName('ul')[0];
       document.body.addEventListener('submit', onSubmit);
       document.body.addEventListener('click', onClick);
-      refreshView()
-        .then(synchronize);
-    });
+      return refreshView()
+    })
+    .then(synchronize);
 
   function onClick(e) {
 

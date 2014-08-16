@@ -220,6 +220,11 @@
         // If there's data, add it to array
         if (result) {
           if (!query || (query.deleted === true && result.value.deleted) || (query.deleted === false && !result.value.deleted)) {
+
+            // There's a bug in the IndexedDBShim that means auto-incrementor
+            // values don't get set - if that's the case, fill them in.
+            // https://github.com/axemclion/IndexedDBShim/issues/40
+            if (!result.value.localId) result.value.localId = result.primaryKey;
             data.push(result.value);
           }
           result.continue();

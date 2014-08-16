@@ -35,18 +35,6 @@
     }
   }
 
-  function renderAllTodos(todos) {
-    var html = '';
-    todos.forEach(function(todo) {
-      html += todoToHtml(todo);
-    });
-    ul.innerHTML = html;
-  }
-
-  function todoToHtml(todo) {
-    return '<li><button id="'+todo.localId+'">delete</button>'+todo.text+'</li>';
-  }
-
   function onSubmit(e) {
     e.preventDefault();
     var todo = {
@@ -59,32 +47,27 @@
       .then(refreshSynchronizeRefresh);
   }
 
-  function databaseOpen() {
-    return new Promise(function(resolve, reject) {
-      var version = 1;
-      var request = indexedDB.open('todos', version);
-
-      // Run migrations if necessary
-      request.onupgradeneeded = function(e) {
-        db = e.target.result;
-        e.target.transaction.onerror = reject;
-
-        var todoStore = db.createObjectStore('todo', { keyPath: 'localId', autoIncrement: true });
-        todoStore.createIndex('remoteId', 'remoteId', { unique: false });
-      };
-
-      request.onsuccess = function(e) {
-        db = e.target.result;
-        resolve();
-      };
-      request.onerror = reject;
+  function renderAllTodos(todos) {
+    var html = '';
+    todos.forEach(function(todo) {
+      html += todoToHtml(todo);
     });
+    ul.innerHTML = html;
+  }
+
+  function todoToHtml(todo) {
+    return '<li><button id="'+todo.localId+'">delete</button>'+todo.text+'</li>';
   }
 
   function refreshSynchronizeRefresh() {
     return refreshView()
       .then(synchronize)
       .then(refreshView);
+  }
+
+  function refreshView() {
+    return databaseTodosGet({ deleted: false })
+      .then(renderAllTodos);
   }
 
   function synchronize() {
@@ -173,9 +156,26 @@
       });
   }
 
-  function refreshView() {
-    return databaseTodosGet({ deleted: false })
-      .then(renderAllTodos);
+  function databaseOpen() {
+    return new Promise(function(resolve, reject) {
+      var version = 1;
+      var request = indexedDB.open('todos', version);
+
+      // Run migrations if necessary
+      request.onupgradeneeded = function(e) {
+        db = e.target.result;
+        e.target.transaction.onerror = reject;
+
+        var todoStore = db.createObjectStore('todo', { keyPath: 'localId', autoIncrement: true });
+        todoStore.createIndex('remoteId', 'remoteId', { unique: false });
+      };
+
+      request.onsuccess = function(e) {
+        db = e.target.result;
+        resolve();
+      };
+      request.onerror = reject;
+    });
   }
 
   function databaseTodosPut(todo, callback) {

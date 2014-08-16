@@ -50,7 +50,7 @@
     var todo = {
       text: input.value,
       updated: Date.now(),
-      remoteId: undefined
+      created: Date.now()
     };
     input.value = '';
     databaseTodosPut(todo)
@@ -67,7 +67,7 @@
   }
 
   function todoToHtml(todo) {
-    return '<li><button id="'+todo.localId+'">delete</button>'+todo.text+'</li>';
+    return '<li><button id="'+todo.created+'">delete</button>'+todo.text+'</li>';
   }
 
   function refreshView() {
@@ -98,55 +98,41 @@
         // posted to the server, post them.
         var promises = localTodos.map(function(todo) {
 
-          // If the remote id exists maybe update the text try to update it
-          if (todo.remoteId) {
-
-            // Has it been marked for deletion?
-            if (todo.deleted) {
-              return serverTodosDelete(todo)
-                .then(function() {
-                  return databaseTodosDelete(todo);
-                });
-            }
-
-            // Otherwise try to update it
-            return serverTodosUpdate(todo)
-
-              // Only need to handle the error case (probably a conflict)
-              .catch(function(res) {
-                return serverTodosGet(todo)
-                  .then(function(res) {
-                    return databaseTodosPut({
-                      localId: todo.localId,
-                      remoteId: todo.remoteId,
-                      text: res.body.text,
-                      updated: res.body.updated
-                    });
-
-                  // Todo has been deleted, delete it locally too
-                  }, function(res) {
-                    if (res.status === 404) databaseTodosDelete(todo);
-                });
+          // Has it been marked for deletion?
+          if (todo.deleted) {
+            return serverTodosDelete(todo)
+              .then(function() {
+                return databaseTodosDelete(todo);
               });
           }
 
-          // Otherwise create on the remote server & update local id
-          return serverTodosAdd(todo)
-            .then(function(res) {
-                todo.remoteId = res.text;
-                return databaseTodosPut(todo);
-            }, function(res) {
-              if (res.status === 400) return databaseTodosDelete(todo);
+          // Otherwise try to update it
+          return serverTodosUpdate(todo)
+
+            // Only need to handle the error case (probably a conflict)
+            .catch(function(res) {
+              return serverTodosGet(todo)
+                .then(function(res) {
+                  return databaseTodosPut({
+                    created: todo.created,
+                    text: res.body.text,
+                    updated: res.body.updated
+                  });
+
+                // Todo has been deleted, delete it locally too
+                }, function(res) {
+                  if (res.status === 404) databaseTodosDelete(todo);
+              });
             });
         });
 
         // Go through the todos that came down from the server,
         // we don't already have one, add it to the local db
         promises.concat(remoteTodos.map(function(todo) {
-          if (!localTodos.some(function(localTodo) { return localTodo.remoteId === todo._id })) {
+          if (!localTodos.some(function(localTodo) { return localTodo.created === todo.created })) {
             return databaseTodosPut({
               text: todo.text,
-              remoteId: todo._id,
+              created: todo.created,
               updated: todo.updated,
             }).then(refreshView);
           }
@@ -172,8 +158,7 @@
         db = e.target.result;
         e.target.transaction.onerror = reject;
 
-        var todoStore = db.createObjectStore('todo', { keyPath: 'localId', autoIncrement: true });
-        todoStore.createIndex('remoteId', 'remoteId', { unique: false });
+        var todoStore = db.createObjectStore('todo', { keyPath: 'created' });
       };
 
       request.onsuccess = function(e) {
@@ -226,11 +211,6 @@
         // If there's data, add it to array
         if (result) {
           if (!query || (query.deleted === true && result.value.deleted) || (query.deleted === false && !result.value.deleted)) {
-
-            // There's a bug in the IndexedDBShim that means auto-incrementor
-            // values don't get set - if that's the case, fill them in.
-            // https://github.com/axemclion/IndexedDBShim/issues/40
-            if (!result.value.localId) result.value.localId = result.primaryKey;
             data.push(result.value);
           }
           result.continue();
@@ -247,31 +227,15 @@
     return new Promise(function(resolve, reject) {
       var transaction = db.transaction(['todo'], 'readwrite');
       var store = transaction.objectStore('todo');
-      var request = store.delete(todo.localId);
+      var request = store.delete(todo.created);
       request.onsuccess = resolve;
       request.onerror = reject;
     });
   }
 
-  function serverTodosAdd(todo) {
-    return new Promise(function(resolve, reject) {
-      superagent.post(host+'/todos')
-        .send({ text: todo.text, updated: todo.updated })
-        .end(function(res) {
-          if (res.ok) {
-            resolve(res);
-
-          // If the server rejects the todo (eg. blank text) reject it
-          } else if (res.status === 400) {
-            reject(res);
-          }
-        });
-    });
-  }
-
   function serverTodosUpdate(todo) {
     return new Promise(function(resolve, reject) {
-      superagent.put(host+'/todos/'+todo.remoteId)
+      superagent.put(host+'/todos/'+todo.created)
         .send({ text: todo.text, updated: todo.updated })
         .end(function(res) {
           if (res.ok) resolve(res);
@@ -282,7 +246,7 @@
 
   function serverTodosGet(todo) {
     return new Promise(function(resolve, reject) {
-      superagent.get(host + '/todos/' + (todo && todo.remoteId ? todo.remoteId : ''))
+      superagent.get(host + '/todos/' + (todo && todo.created ? todo.created : ''))
         .end(function(err, res) {
           if (res.ok) resolve(res);
           else reject(res);
@@ -292,7 +256,7 @@
 
   function serverTodosDelete(todo) {
     return new Promise(function(resolve, reject) {
-      superagent.del(host+'/todos/'+todo.remoteId)
+      superagent.del(host+'/todos/'+todo.created)
         .send({ text: todo.text, updated: todo.updated })
         .end(function(res) {
           if (res.ok) resolve();

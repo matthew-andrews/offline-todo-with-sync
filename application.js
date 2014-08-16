@@ -121,7 +121,7 @@
 
                 // Todo has been deleted, delete it locally too
                 }, function(res) {
-                  if (res.status === 404) databaseTodosDelete(todo);
+                  if (res.status === 410) return databaseTodosDelete(todo);
               });
             });
         });
@@ -130,11 +130,7 @@
         // we don't already have one, add it to the local db
         promises.concat(remoteTodos.map(function(todo) {
           if (!localTodos.some(function(localTodo) { return localTodo.created === todo.created })) {
-            return databaseTodosPut({
-              text: todo.text,
-              created: todo.created,
-              updated: todo.updated,
-            }).then(refreshView);
+            return databaseTodosPut(todo);
           }
         }));
         return Promise.all(promises);
@@ -248,7 +244,7 @@
     return new Promise(function(resolve, reject) {
       superagent.get(host + '/todos/' + (todo && todo.created ? todo.created : ''))
         .end(function(err, res) {
-          if (res.ok) resolve(res);
+          if (!err && res.ok) resolve(res);
           else reject(res);
         });
     });

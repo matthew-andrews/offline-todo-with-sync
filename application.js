@@ -180,7 +180,7 @@
   }
 
   function refreshView() {
-    return databaseTodosGetByDeleted(false)
+    databaseTodosGetByDeleted(false)
       .then(renderAllTodos);
   }
 

@@ -6,14 +6,15 @@
   // Some global variables (database, references to key UI elements)
   var db, input, ul;
 
-  databaseOpen().then(function() {
-    input = document.getElementsByTagName('input')[0];
-    ul = document.getElementsByTagName('ul')[0];
-    document.body.addEventListener('submit', onSubmit);
-    document.body.addEventListener('click', onClick);
-    refreshView();
-    synchronize();
-  });
+  databaseOpen()
+    .then(function() {
+      input = document.getElementsByTagName('input')[0];
+      ul = document.getElementsByTagName('ul')[0];
+      document.body.addEventListener('submit', onSubmit);
+      document.body.addEventListener('click', onClick);
+      refreshView()
+        .then(synchronize);
+    });
 
   function onClick(e) {
 
@@ -30,8 +31,8 @@
           return databaseTodosPut(todo)
         })
         .then(function() {
-          refreshView();
-          synchronize();
+          refreshView()
+            .then(synchronize);
         });
     }
   }
@@ -56,9 +57,9 @@
       remoteId: undefined
     };
     databaseTodosPut(todo)
+      // After new todos have been added - rerender all the todos
+      .then(refreshView)
       .then(function() {
-        // After new todos have been added - rerender all the todos
-        refreshView();
         synchronize();
         input.value = '';
       });
@@ -153,7 +154,7 @@
                   if (res.ok) {
                     todo.remoteId = res.text;
                     databaseTodosPut(todo)
-                      .then(refreshView());
+                      .then(refreshView);
 
                   // If the server rejects the todo (eg. blank text) reject it
                   } else if (res.status === 400) {
@@ -180,7 +181,7 @@
   }
 
   function refreshView() {
-    databaseTodosGetByDeleted(false)
+    return databaseTodosGetByDeleted(false)
       .then(renderAllTodos);
   }
 

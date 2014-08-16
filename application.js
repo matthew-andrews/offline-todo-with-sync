@@ -1,5 +1,5 @@
 (function() {
-  var host = 'http://localhost:3000';
+  var host = location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://offline-todo-api.herokuapp.com';
 
   var request = superagent;
  

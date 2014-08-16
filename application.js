@@ -88,6 +88,7 @@
       return console.log("cannot sync right now");
     }
     console.log('starting sync');
+    synchronizeInProgress = true;
     return Promise.all([serverTodosGet(), databaseTodosGet()])
         .then(function(results) {
           var remoteTodos = results[0].body;

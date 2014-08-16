@@ -16,7 +16,15 @@
       document.body.addEventListener('click', onClick);
     })
     .then(refreshView)
-    .then(synchronize);
+    .then(synchronize)
+    .then(function() {
+      var source = new EventSource(host+'/todos/stream');
+      source.addEventListener('message', function() {
+        if (!synchronizeInProgress) {
+          synchronize();
+        }
+      });
+    });
 
   function onClick(e) {
 

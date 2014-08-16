@@ -65,7 +65,6 @@
 
   function databaseOpen() {
     return new Promise(function(resolve, reject) {
-      // Open a database, specify the name and version
       var version = 1;
       var request = indexedDB.open('todos', version);
 
@@ -88,90 +87,90 @@
 
   function synchronize() {
     return new Promise(function(resolve, reject) {
-      request.get(host+'/todos', function(err, res) {
-        if (err) return console.error("Cannot connect to server");
-        var remoteTodos = res.body;
+      serverTodosGet()
+        .then(function(res) {
+          return databaseTodosGet()
+            .then(function(localTodos) {
+              var localTodosRemoteIds = localTodos
+                .map(function(todo) { return todo.remoteId; });
 
-        return databaseTodosGetByDeleted(undefined)
-          .then(function(localTodos) {
-            var localTodosRemoteIds = localTodos
-              .map(function(todo) { return todo.remoteId; });
+              // Loop through local todos and if they haven't been
+              // posted to the server, post them.
+              localTodos.forEach(function(todo) {
 
-            // Loop through local todos and if they haven't been
-            // posted to the server, post them.
-            localTodos.forEach(function(todo) {
+                // If the remote id exists maybe update the text try to update it
+                if (todo.remoteId) {
 
-              // If the remote id exists maybe update the text try to update it
-              if (todo.remoteId) {
+                  // Has it been marked for deletion?
+                  if (todo.deleted) {
+                    serverTodosDelete(todo)
+                      .then(function() {
+                        databaseTodosDelete(todo);
+                      });
 
-                // Has it been marked for deletion?
-                if (todo.deleted) {
-                  serverTodosDelete(todo)
-                    .then(function() {
-                      databaseTodosDelete(todo);
-                    });
+                  // Otherwise try to update it
+                  } else {
+                    serverTodosUpdate(todo)
 
-                // Otherwise try to update it
+                      // Only need to handle the error case (probably a conflict)
+                      .catch(function(res) {
+                        request.get(host+'/todos/'+todo.remoteId)
+                          .end(function(res) {
+                            // Todo has been deleted, delete it locally too
+                            if (res.status === 404) {
+                              databaseTodosDelete(todo)
+                                .then(refreshView);
+
+                            // Otherwise update it with whatever the server thinks is right
+                            } else {
+                              databaseTodosPut({
+                                localId: todo.localId,
+                                remoteId: todo.remoteId,
+                                text: res.body.text,
+                                updated: res.body.updated
+                              }).then(refreshView);
+                            }
+                          });
+                      });
+                  }
+
+                // Otherwise create on the remote server & update local id
                 } else {
-                  serverTodosUpdate(todo)
-
-                    // Only need to handle the error case (probably a conflict)
+                  serverTodosAdd(todo)
+                    .then(function(res) {
+                        todo.remoteId = res.text;
+                        databaseTodosPut(todo)
+                          .then(refreshView);
+                    })
                     .catch(function(res) {
-                      request.get(host+'/todos/'+todo.remoteId)
-                        .end(function(res) {
-                          // Todo has been deleted, delete it locally too
-                          if (res.status === 404) {
-                            databaseTodosDelete(todo)
-                              .then(refreshView);
-
-                          // Otherwise update it with whatever the server thinks is right
-                          } else {
-                            databaseTodosPut({
-                              localId: todo.localId,
-                              remoteId: todo.remoteId,
-                              text: res.body.text,
-                              updated: res.body.updated
-                            }).then(refreshView);
-                          }
-                        });
+                      if (res.status === 400) {
+                        databaseTodosDelete(todo)
+                          .then(refreshView);
+                      }
                     });
                 }
+              });
+              res.body.forEach(function(todo) {
+                var localCopyIndex = localTodosRemoteIds.indexOf(todo._id);
 
-              // Otherwise create on the remote server & update local id
-              } else {
-                serverTodosAdd(todo)
-                  .then(function(res) {
-                      todo.remoteId = res.text;
-                      databaseTodosPut(todo)
-                        .then(refreshView);
-                  })
-                  .catch(function(res) {
-                    if (res.status === 400) {
-                      databaseTodosDelete(todo)
-                        .then(refreshView);
-                    }
-                  });
-              }
+                // We don't have todo, maybe create it?
+                if (localCopyIndex === -1) {
+                  databaseTodosPut({
+                    text: todo.text,
+                    remoteId: todo._id,
+                    updated: todo.updated,
+                  }).then(refreshView);
+                }
+              });
             });
-            remoteTodos.forEach(function(todo) {
-              var localCopyIndex = localTodosRemoteIds.indexOf(todo._id);
-
-              // We don't have todo, maybe create it?
-              if (localCopyIndex === -1) {
-                databaseTodosPut({
-                  text: todo.text,
-                  remoteId: todo._id,
-                  updated: todo.updated,
-                }).then(refreshView);
-              }
-            });
-          });
-      });
+        }, function(err) {
+          console.error("Cannot connect to server");
+        });
     });
   }
 
   function refreshView() {
-    return databaseTodosGetByDeleted(false)
+    return databaseTodosGet({ deleted: false })
       .then(renderAllTodos);
   }
 
@@ -198,7 +197,7 @@
     });
   };
 
-  function databaseTodosGetByDeleted(deleted) {
+  function databaseTodosGet(query) {
     return new Promise(function(resolve, reject) {
       var transaction = db.transaction(['todo'], 'readwrite');
       var store = transaction.objectStore('todo');
@@ -216,7 +215,7 @@
 
         // If there's data, add it to array
         if (result) {
-          if (deleted === undefined || (deleted === true && result.value.deleted) || (deleted === false && !result.value.deleted)) {
+          if (!query || (query.deleted === true && result.value.deleted) || (query.deleted === false && !result.value.deleted)) {
             data.push(result.value);
           }
           result.continue();
@@ -262,6 +261,16 @@
         .end(function(res) {
           if (res.ok) resolve(res);
           else reject(res);
+        });
+    });
+  }
+
+  function serverTodosGet(todo) {
+    return new Promise(function(resolve, reject) {
+      request.get(host + '/todos/' + (todo && todo.remoteId ? todo.remoteId : ''))
+        .end(function(err, res) {
+          if (res.ok) resolve(res);
+          else reject(err);
         });
     });
   }

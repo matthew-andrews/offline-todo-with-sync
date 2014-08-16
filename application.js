@@ -30,10 +30,8 @@
           todo.updated = Date.now();
           return databaseTodosPut(todo)
         })
-        .then(function() {
-          refreshView()
-            .then(synchronize);
-        });
+        .then(refreshView)
+        .then(synchronize);
     }
   }
 

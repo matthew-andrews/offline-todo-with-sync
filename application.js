@@ -13,11 +13,7 @@
     .then(synchronize)
     .then(function() {
       var source = new EventSource(host+'/todos/stream');
-      source.addEventListener('message', function() {
-        if (!synchronizeInProgress) {
-          synchronize();
-        }
-      });
+      source.addEventListener('message', synchronize);
     });
 
   function onClick(e) {
@@ -89,8 +85,9 @@
             return serverTodosDelete(todo).then(deleteTodo);
           }
 
-          // Check the todo still exists, and if not delete it
-          return serverTodosGet(todo._id)
+          // Create the todo on the remote server, or if it already exists quietly
+          // don't do anything, or if it's deleted remotely deleted it locally
+          return serverTodosPut(todo)
             .catch(function(res) {
               if (res.status === 410) return deleteTodo();
             });
@@ -199,6 +196,17 @@
       superagent.get(host + '/todos/' + (_id ? _id : ''))
         .end(function(err, res) {
           if (!err && res.ok) resolve(res);
+          else reject(res);
+        });
+    });
+  }
+
+  function serverTodosPut(todo) {
+    return new Promise(function(resolve, reject) {
+      superagent.put(host+'/todos/'+todo._id)
+        .send(todo)
+        .end(function(res) {
+          if (res.ok) resolve(res);
           else reject(res);
         });
     });

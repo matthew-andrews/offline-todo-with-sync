@@ -48,7 +48,7 @@
     e.preventDefault();
     var todo = {
       text: input.value,
-      _id: Date.now()
+      _id: String(Date.now())
     };
     input.value = '';
     databaseTodosPut(todo)

@@ -34,7 +34,7 @@
 
       // Note because the id is stored in the DOM, it becomes
       // a string so need to make it an integer again
-      databaseTodosGetByLocalId(parseInt(e.target.getAttribute('id'), 10))
+      databaseTodosGetByLocalId(e.target.getAttribute('id'))
         .then(function(todo) {
           todo.deleted = true;
           return databaseTodosPut(todo);

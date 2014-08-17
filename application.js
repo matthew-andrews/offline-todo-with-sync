@@ -1,5 +1,5 @@
 (function() {
-  var host = location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://offline-todo-api.herokuapp.com';
+  var api = 'http' + (location.hostname === 'localhost' ? '://localhost:3000' : 's://offline-todo-api.herokuapp.com') + '/todos';
   var synchronizeInProgress, willSynchronizePromise, db, input, ul;
 
   databaseOpen()
@@ -12,7 +12,7 @@
     .then(refreshView)
     .then(synchronize)
     .then(function() {
-      var source = new EventSource(host+'/todos/stream');
+      var source = new EventSource(api+'/stream');
       source.addEventListener('message', synchronize);
     });
 
@@ -193,7 +193,7 @@
 
   function serverTodosGet(_id) {
     return new Promise(function(resolve, reject) {
-      superagent.get(host + '/todos/' + (_id ? _id : ''))
+      superagent.get(api+'/' + (_id ? _id : ''))
         .end(function(err, res) {
           if (!err && res.ok) resolve(res);
           else reject(res);
@@ -203,7 +203,7 @@
 
   function serverTodosPut(todo) {
     return new Promise(function(resolve, reject) {
-      superagent.put(host+'/todos/'+todo._id)
+      superagent.put(api+'/'+todo._id)
         .send(todo)
         .end(function(res) {
           if (res.ok) resolve(res);
@@ -214,7 +214,7 @@
 
   function serverTodosDelete(todo) {
     return new Promise(function(resolve, reject) {
-      superagent.del(host+'/todos/'+todo._id)
+      superagent.del(api+'/'+todo._id)
         .end(function(res) {
           if (res.ok) resolve();
           else reject();

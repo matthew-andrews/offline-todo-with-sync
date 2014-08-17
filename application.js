@@ -1,7 +1,6 @@
 (function() {
   var host = location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://offline-todo-api.herokuapp.com';
-  var synchronizeInProgress = false, willSynchronizePromise;
-  var db, input, ul;
+  var synchronizeInProgress, willSynchronizePromise, db, input, ul;
 
   databaseOpen()
     .then(function() {

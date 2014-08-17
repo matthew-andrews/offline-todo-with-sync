@@ -109,10 +109,7 @@
 
             // Only need to handle the error case (it's probably been deleted)
             .catch(function(res) {
-              return serverTodosGet(todo)
-                .then(function(res) {
-                  if (res.status === 410) return databaseTodosDelete(todo);
-              });
+              if (res.status === 410) return databaseTodosDelete(todo);
             });
         });
 

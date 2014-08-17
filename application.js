@@ -1,6 +1,5 @@
 (function() {
   var host = location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://offline-todo-api.herokuapp.com';
-
   var synchronizeInProgress = false, willSynchronizePromise;
   var db, input, ul;
 
@@ -36,10 +35,7 @@
 
   function onSubmit(e) {
     e.preventDefault();
-    var todo = {
-      text: input.value,
-      _id: String(Date.now())
-    };
+    var todo = { text: input.value, _id: String(Date.now()) };
     input.value = '';
     databaseTodosPut(todo)
       .then(refreshView)
@@ -59,8 +55,7 @@
   }
 
   function refreshView() {
-    return databaseTodosGet({ deleted: false })
-      .then(renderAllTodos);
+    return databaseTodosGet({ deleted: false }).then(renderAllTodos);
   }
 
   function synchronize() {
@@ -219,5 +214,4 @@
         });
     });
   }
-
 }());

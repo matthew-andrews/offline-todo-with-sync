@@ -1,11 +1,7 @@
 (function() {
   var host = location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://offline-todo-api.herokuapp.com';
 
-  // Some globals (although they should probably be private) to stop synchronization
-  // running twice at the same time
   var synchronizeInProgress = false, willSynchronizePromise;
-
-  // Some global variables (database, references to key UI elements)
   var db, input, ul;
 
   databaseOpen()
@@ -27,13 +23,7 @@
     });
 
   function onClick(e) {
-
-    // We'll assume any element with an ID attribute
-    // is a todo item. Don't try this at home!
     if (e.target.hasAttribute('id')) {
-
-      // Note because the id is stored in the DOM, it becomes
-      // a string so need to make it an integer again
       databaseTodosGetByLocalId(e.target.getAttribute('id'))
         .then(function(todo) {
           todo.deleted = true;
@@ -89,29 +79,28 @@
     synchronizeInProgress = true;
     return Promise.all([serverTodosGet(), databaseTodosGet()])
       .then(function(results) {
+        var promises = [];
         var remoteTodos = results[0].body;
         var localTodos = results[1];
 
         // Loop through local todos and if they haven't been
         // posted to the server, post them.
-        var promises = localTodos.map(function(todo) {
+        promises.concat(localTodos.map(function(todo) {
+          var deleteTodo = function() {
+            return databaseTodosDelete(todo);
+          };
 
           // Has it been marked for deletion?
           if (todo.deleted) {
-            return serverTodosDelete(todo)
-              .then(function() {
-                return databaseTodosDelete(todo);
-              });
+            return serverTodosDelete(todo).then(deleteTodo);
           }
 
-          // Otherwise try to update it
-          return serverTodosUpdate(todo)
-
-            // Only need to handle the error case (it's probably been deleted)
+          // Check the todo still exists, and if not delete it
+          return serverTodosGet(todo._id)
             .catch(function(res) {
-              if (res.status === 410) return databaseTodosDelete(todo);
+              if (res.status === 410) return deleteTodo();
             });
-        });
+        }));
 
         // Go through the todos that came down from the server,
         // we don't already have one, add it to the local db
@@ -124,8 +113,8 @@
     }, function(err) {
       console.error(err, "Cannot connect to server");
     })
+    .then(refreshView)
     .then(function() {
-      refreshView();
       synchronizeInProgress = false;
       document.body.dispatchEvent(new Event('synchronized'));
     });
@@ -135,15 +124,11 @@
     return new Promise(function(resolve, reject) {
       var version = 1;
       var request = indexedDB.open('todos', version);
-
-      // Run migrations if necessary
       request.onupgradeneeded = function(e) {
         db = e.target.result;
         e.target.transaction.onerror = reject;
-
-        var todoStore = db.createObjectStore('todo', { keyPath: '_id' });
+        db.createObjectStore('todo', { keyPath: '_id' });
       };
-
       request.onsuccess = function(e) {
         db = e.target.result;
         resolve();
@@ -184,9 +169,8 @@
       var keyRange = IDBKeyRange.lowerBound(0);
       var cursorRequest = store.openCursor(keyRange);
 
-      // This fires once per row in the store, so for simplicity
-      // collect the data in an array (data) and send it pass it
-      // in the callback in one go
+      // This fires once per row in the store, so for simplicity collect the data
+      // in an array (data) and send it pass it in the callback in one go
       var data = [];
       cursorRequest.onsuccess = function(e) {
         var result = e.target.result;
@@ -216,20 +200,9 @@
     });
   }
 
-  function serverTodosUpdate(todo) {
+  function serverTodosGet(_id) {
     return new Promise(function(resolve, reject) {
-      superagent.put(host+'/todos/'+todo._id)
-        .send({ text: todo.text })
-        .end(function(res) {
-          if (res.ok) resolve(res);
-          else reject(res);
-        });
-    });
-  }
-
-  function serverTodosGet(todo) {
-    return new Promise(function(resolve, reject) {
-      superagent.get(host + '/todos/' + (todo && todo._id ? todo._id : ''))
+      superagent.get(host + '/todos/' + (_id ? _id : ''))
         .end(function(err, res) {
           if (!err && res.ok) resolve(res);
           else reject(res);

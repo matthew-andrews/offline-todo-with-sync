@@ -75,7 +75,7 @@
 
         // Loop through local todos and if they haven't been
         // posted to the server, post them.
-        promises.concat(localTodos.map(function(todo) {
+        promises = promises.concat(localTodos.map(function(todo) {
           var deleteTodo = function() {
             return databaseTodosDelete(todo);
           };
@@ -95,7 +95,7 @@
 
         // Go through the todos that came down from the server,
         // we don't already have one, add it to the local db
-        promises.concat(remoteTodos.map(function(todo) {
+        promises = promises.concat(remoteTodos.map(function(todo) {
           if (!localTodos.some(function(localTodo) { return localTodo._id === todo._id; })) {
             return databaseTodosPut(todo);
           }

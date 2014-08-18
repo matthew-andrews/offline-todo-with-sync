@@ -116,7 +116,7 @@
   function databaseOpen() {
     return new Promise(function(resolve, reject) {
       var version = 1;
-      var request = indexedDB.open('todos', version);
+      var request = indexedDB.open('syncing-todos', version);
       request.onupgradeneeded = function(e) {
         db = e.target.result;
         e.target.transaction.onerror = reject;

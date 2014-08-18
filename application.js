@@ -85,12 +85,14 @@
             return serverTodosDelete(todo).then(deleteTodo);
           }
 
-          // Create the todo on the remote server, or if it already exists quietly
-          // don't do anything, or if it's deleted remotely deleted it locally
-          return serverTodosPut(todo)
-            .catch(function(res) {
-              if (res.status === 410) return deleteTodo();
-            });
+          // If this is a todo that doesn't exist on the server try to create
+          // it (if it fails because it's gone, delete it locally)
+          if (!remoteTodos.some(function(remoteTodo) { return remoteTodo._id === todo._id; })) {
+            return serverTodosPost(todo)
+              .catch(function(res) {
+                if (res.status === 410) return deleteTodo();
+              });
+          }
         }));
 
         // Go through the todos that came down from the server,
@@ -201,9 +203,9 @@
     });
   }
 
-  function serverTodosPut(todo) {
+  function serverTodosPost(todo) {
     return new Promise(function(resolve, reject) {
-      superagent.put(api+'/'+todo._id)
+      superagent.post(api)
         .send(todo)
         .end(function(res) {
           if (res.ok) resolve(res);
@@ -214,7 +216,7 @@
 
   function serverTodosDelete(todo) {
     return new Promise(function(resolve, reject) {
-      superagent.del(api+'/'+todo._id)
+      superagent.del(api + '/' + todo._id)
         .end(function(res) {
           if (res.ok) resolve();
           else reject();

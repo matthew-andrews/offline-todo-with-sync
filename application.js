@@ -87,7 +87,7 @@
 
           // If this is a todo that doesn't exist on the server try to create
           // it (if it fails because it's gone, delete it locally)
-          if (!remoteTodos.some(function(remoteTodo) { return remoteTodo._id === todo._id; })) {
+          if (!arrayContainsTodo(remoteTodos, todo)) {
             return serverTodosPost(todo)
               .catch(function(res) {
                 if (res.status === 410) return deleteTodo();
@@ -98,7 +98,7 @@
         // Go through the todos that came down from the server,
         // we don't already have one, add it to the local db
         promises = promises.concat(remoteTodos.map(function(todo) {
-          if (!localTodos.some(function(localTodo) { return localTodo._id === todo._id; })) {
+          if (!arrayContainsTodo(localTodos, todo)) {
             return databaseTodosPut(todo);
           }
         }));
@@ -110,6 +110,12 @@
     .then(function() {
       synchronizeInProgress = false;
       document.body.dispatchEvent(new Event('synchronized'));
+    });
+  }
+
+  function arrayContainsTodo(array, todo) {
+    return array.some(function(arrayTodo) {
+      return arrayTodo._id === todo._id;
     });
   }
 

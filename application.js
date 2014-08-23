@@ -18,7 +18,7 @@
 
   function onClick(e) {
     if (e.target.hasAttribute('id')) {
-      databaseTodosGetByLocalId(e.target.getAttribute('id'))
+      databaseTodosGetById(e.target.getAttribute('id'))
         .then(function(todo) {
           todo.deleted = true;
           return databaseTodosPut(todo);
@@ -146,7 +146,7 @@
     });
   }
 
-  function databaseTodosGetByLocalId(id, callback) {
+  function databaseTodosGetById(id, callback) {
     return new Promise(function(resolve, reject) {
       var transaction = db.transaction(['todo'], 'readwrite');
       var store = transaction.objectStore('todo');

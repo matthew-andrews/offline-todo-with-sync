@@ -136,7 +136,7 @@
     });
   }
 
-  function databaseTodosPut(todo, callback) {
+  function databaseTodosPut(todo) {
     return new Promise(function(resolve, reject) {
       var transaction = db.transaction(['todo'], 'readwrite');
       var store = transaction.objectStore('todo');
@@ -146,7 +146,7 @@
     });
   }
 
-  function databaseTodosGetById(id, callback) {
+  function databaseTodosGetById(id) {
     return new Promise(function(resolve, reject) {
       var transaction = db.transaction(['todo'], 'readwrite');
       var store = transaction.objectStore('todo');
@@ -169,7 +169,7 @@
       var cursorRequest = store.openCursor(keyRange);
 
       // This fires once per row in the store, so for simplicity collect the data
-      // in an array (data) and send it pass it in the callback in one go
+      // in an array (data) and send it pass it in the resolve call in one go
       var data = [];
       cursorRequest.onsuccess = function(e) {
         var result = e.target.result;

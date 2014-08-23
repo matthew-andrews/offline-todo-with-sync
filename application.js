@@ -1,6 +1,7 @@
 (function() {
   var api = 'http' + (location.hostname === 'localhost' ? '://localhost:3000' : 's://offline-todo-api.herokuapp.com') + '/todos';
-  var synchronizeInProgress, willSynchronizePromise, db, input, ul;
+  var synchronizeInProgress, willSynchronizePromise;
+  var db, input, ul;
 
   databaseOpen()
     .then(function() {
@@ -31,10 +32,16 @@
   function onSubmit(e) {
     e.preventDefault();
     var todo = { text: input.value, _id: String(Date.now()) };
-    input.value = '';
     databaseTodosPut(todo)
+      .then(function() {
+        input.value = '';
+      })
       .then(refreshView)
       .then(synchronize);
+  }
+
+  function refreshView() {
+    return databaseTodosGet({ deleted: false }).then(renderAllTodos);
   }
 
   function renderAllTodos(todos) {
@@ -47,10 +54,6 @@
 
   function todoToHtml(todo) {
     return '<li><button id="'+todo._id+'">delete</button>'+todo.text+'</li>';
-  }
-
-  function refreshView() {
-    return databaseTodosGet({ deleted: false }).then(renderAllTodos);
   }
 
   function synchronize() {
@@ -122,7 +125,7 @@
   function databaseOpen() {
     return new Promise(function(resolve, reject) {
       var version = 1;
-      var request = indexedDB.open('syncing-todos', version);
+      var request = indexedDB.open('todos', version);
       request.onupgradeneeded = function(e) {
         db = e.target.result;
         e.target.transaction.onerror = reject;

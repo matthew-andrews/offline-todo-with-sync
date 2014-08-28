@@ -1,6 +1,6 @@
 (function() {
   var api = 'http' + (location.hostname === 'localhost' ? '://localhost:3000' : 's://offline-todo-api.herokuapp.com') + '/todos';
-  var synchronizeInProgress, willSynchronizePromise;
+  var synchronizeInProgress;
   var db, input, ul;
 
   databaseOpen()
@@ -57,20 +57,8 @@
   }
 
   function synchronize() {
-    if (synchronizeInProgress) {
-      if (!willSynchronizePromise) {
-        willSynchronizePromise = new Promise(function(resolve, reject) {
-          document.body.addEventListener('synchronized', function onSynchronized() {
-            willSynchronizePromise = undefined;
-            document.body.removeEventListener('synchronized', onSynchronized);
-            resolve();
-          });
-        }).then(synchronize);
-      }
-      return willSynchronizePromise;
-    }
-    synchronizeInProgress = true;
-    return Promise.all([serverTodosGet(), databaseTodosGet()])
+    if (synchronizeInProgress) return synchronizeInProgress;
+    synchronizeInProgress = Promise.all([serverTodosGet(), databaseTodosGet()])
       .then(function(results) {
         var promises = [];
         var remoteTodos = results[0].body;
@@ -111,9 +99,9 @@
     })
     .then(refreshView)
     .then(function() {
-      synchronizeInProgress = false;
-      document.body.dispatchEvent(new Event('synchronized'));
+      synchronizeInProgress = undefined;
     });
+    return synchronizeInProgress;
   }
 
   function arrayContainsTodo(array, todo) {

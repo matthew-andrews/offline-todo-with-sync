@@ -139,7 +139,7 @@
 
   function databaseTodosGet(query) {
     return new Promise(function(resolve, reject) {
-      var transaction = db.transaction(['todo'], 'readwrite');
+      var transaction = db.transaction(['todo'], 'readonly');
       var store = transaction.objectStore('todo');
 
       // Get everything in the store
@@ -169,7 +169,7 @@
 
   function databaseTodosGetById(id) {
     return new Promise(function(resolve, reject) {
-      var transaction = db.transaction(['todo'], 'readwrite');
+      var transaction = db.transaction(['todo'], 'readonly');
       var store = transaction.objectStore('todo');
       var request = store.get(id);
       request.onsuccess = function(e) {

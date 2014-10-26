@@ -1,5 +1,5 @@
 (function() {
-  var api = 'http' + (location.hostname === 'localhost' ? '://localhost:3000' : 's://offline-todo-api.herokuapp.com') + '/todos';
+  var api = 'https://offline-todo-api.herokuapp.com/todos';
   var synchronizeInProgress;
   var db, input, ul;
 
@@ -61,7 +61,7 @@
     synchronizeInProgress = Promise.all([serverTodosGet(), databaseTodosGet()])
       .then(function(results) {
         var promises = [];
-        var remoteTodos = results[0].body;
+        var remoteTodos = results[0];
         var localTodos = results[1];
 
         // Loop through local todos and if they haven't been
@@ -80,8 +80,8 @@
           // it (if it fails because it's gone, delete it locally)
           if (!arrayContainsTodo(remoteTodos, todo)) {
             return serverTodosPost(todo)
-              .catch(function(res) {
-                if (res.status === 410) return deleteTodo();
+              .catch(function(error) {
+                if (error.message === 'Gone') return deleteTodo();
               });
           }
         }));
@@ -191,33 +191,28 @@
   }
 
   function serverTodosGet(_id) {
-    return new Promise(function(resolve, reject) {
-      superagent.get(api+'/' + (_id ? _id : ''))
-        .end(function(err, res) {
-          if (!err && res.ok) resolve(res);
-          else reject(res);
-        });
-    });
+    return fetch(api + '/' + (_id ? _id : ''))
+      .then(function(response) {
+        return response.json();
+      });
   }
 
   function serverTodosPost(todo) {
-    return new Promise(function(resolve, reject) {
-      superagent.post(api)
-        .send(todo)
-        .end(function(res) {
-          if (res.ok) resolve(res);
-          else reject(res);
-        });
-    });
+    return fetch(api, {
+        method: 'post',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(todo)
+      })
+        .then(function(response) {
+          if (response.status === 410) throw new Error(response.statusText);
+	  return response;
+	});
   }
 
   function serverTodosDelete(todo) {
-    return new Promise(function(resolve, reject) {
-      superagent.del(api + '/' + todo._id)
-        .end(function(res) {
-          if (res.ok) resolve(res);
-          else reject();
-        });
-    });
+    return fetch(api + '/' + todo._id, { method: 'delete' })
   }
 }());
